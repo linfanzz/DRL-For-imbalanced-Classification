@@ -5,7 +5,7 @@ from PIL import Image
 import keras.backend as K
 import numpy as np
 from keras.optimizers import Adam
-from keras.backend.tensorflow_backend import set_session
+from keras.backend import set_session
 from rl.agents.dqn import DQNAgent
 from rl.policy import LinearAnnealedPolicy, BoltzmannQPolicy, EpsGreedyQPolicy
 from rl.memory import SequentialMemory

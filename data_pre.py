@@ -4,7 +4,7 @@ from keras.datasets import mnist,fashion_mnist,cifar10,imdb
 import random
 from sklearn.metrics import confusion_matrix
 import numpy as np
-from keras.preprocessing.sequence import pad_sequences
+from keras.utils import pad_sequences
 
 def load_famnist():
     (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
