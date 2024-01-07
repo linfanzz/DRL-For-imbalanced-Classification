@@ -7,22 +7,26 @@ from gym import utils
 from gym.utils import seeding
 from sklearn.metrics import classification_report, confusion_matrix, precision_recall_fscore_support
 from imblearn.metrics import geometric_mean_score
+from get_model import _pkt_num, _pkt_bytes, _num_class
+from data_pre import generate_ds
+
+
 
 class ClassifyEnv(gym.Env):
 
-    def __init__(self, mode, trainx, trainy, ):  # mode means training or testing
+    def __init__(self, mode, data_path):  # mode means training or testing
         self.mode = mode
 
-        self.Env_data = trainx
-        self.Answer = trainy
-        self.id = np.arange(trainx.shape[0])
+        self.data_path = data_path
+        self.ds = generate_ds(self.data_path)
+        self.numpy_iter = self.ds.as_numpy_iterator()
+        self.Answer = []
 
-        self.game_len = self.Env_data.shape[0]
-
-        self.num_classes = len(set(self.Answer))
+        self.num_classes = _num_class
         self.action_space = spaces.Discrete(self.num_classes)
-        self.observation_space = spaces.Box(low=0, high=1, shape=(20,256,1), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(_pkt_num,_pkt_bytes,1), dtype=np.float32)
         print(self.action_space)
+        print(self.observation_space)
         self.step_ind = 0
         self.y_pred = []
 
@@ -30,32 +34,57 @@ class ClassifyEnv(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
+    def get_feature_label_done(self):
+        # return feature, lable, done
+        feature = self.next_feature
+        label = self.next_label
+        done = False
+        try:
+            numpy = self.numpy_iter.next()
+            self.next_feature = numpy[0]
+            self.next_feature = self.next_feature.reshape(_pkt_num, _pkt_bytes, 1)
+            self.next_label = numpy[1]
+        except StopIteration:
+            done = True
+        return feature, label, done
+        
+    
     # return: (states, observations)
     def reset(self):
-        if self.mode == 'train':
-            np.random.shuffle(self.id)
-        self.step_ind = 0
-        self.y_pred = []
-        return self.Env_data[self.id[self.step_ind]]
+        self.ds = generate_ds(self.data_path)
+        self.numpy_iter = self.ds.as_numpy_iterator()
+        # 因为迭代器特性，第一条数据需要特殊处理
+        numpy = self.numpy_iter.next()
+        self.next_feature = numpy[0]
+        self.next_feature = self.next_feature.reshape(_pkt_num, _pkt_bytes, 1)
+        self.next_label = numpy[1]
+        # 第一条数据处理完毕
 
-    def step(self, a):
-        self.y_pred.append(a)
-        y_true_cur = []
+        feature, label, _ = self.get_feature_label_done()
+        self.step_ind = 0
+        self.Answer = []
+        self.Answer.append(label)
+        self.y_pred = []
+
+        return feature
+
+    def step(self, action):
+        self.y_pred.append(action)
         info = {}
-        terminal = False
-        if a == self.Answer[self.id[self.step_ind]]:
+        feature, label, terminal = self.get_feature_label_done()
+        self.Answer.append(label)
+
+        if action == self.Answer[self.step_ind]:
             reward = 1
         else:
             reward = -1
         self.step_ind += 1
 
-        if self.step_ind == self.game_len - 1:
-            y_true_cur = self.Answer[self.id]
+        if terminal:
             info['gmean'], info['fmeasure'] = self.My_metrics(np.array(self.y_pred),
-                                                              np.array(y_true_cur[:self.step_ind]))
-            terminal = True
+                                                              np.array(self.Answer[:self.step_ind]))
 
-        return self.Env_data[self.id[self.step_ind]], reward, terminal, info
+        return feature, reward, terminal, info
     @staticmethod
     def My_metrics(y_pre, y_true):
         # TODO(zenglf): 计算多分类问题的G_mean, F1, precision, recall, TP, TN, FP, FN
@@ -81,3 +110,9 @@ if __name__=='__main__':
     g_mean, f1 = ClassifyEnv.My_metrics(y_pre=y_pre, y_true=y_true)
     print(f"g_mean: {g_mean}")
     print(f"f1: {f1}")
+
+    test_path='D:\\ids2018\\tfrecord\\test'
+    env = ClassifyEnv('test', data_path=test_path)
+    observation = env.reset()
+    print(observation.shape)
+    print(observation.dtype)

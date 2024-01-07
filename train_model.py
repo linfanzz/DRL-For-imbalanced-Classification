@@ -11,9 +11,12 @@ from rl.policy import LinearAnnealedPolicy, BoltzmannQPolicy, EpsGreedyQPolicy
 from rl.memory import SequentialMemory
 from rl.core import Processor
 from ICMDP_Env import ClassifyEnv
-from  get_model import get_pbcnn_model
-from data_pre import load_data, get_imb_data
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+from get_model import get_pbcnn_model, _pkt_num, _pkt_bytes, _num_class
+from data_pre import generate_ds
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+print(tf.__version__)
+print(tf.executing_eagerly())
+# tf.enable_eager_execution()
 
 parser = argparse.ArgumentParser()
 # parser.add_argument('--data',choices=['mnist', 'cifar10','famnist','imdb'], default='famnist')
@@ -21,25 +24,22 @@ parser = argparse.ArgumentParser()
 # parser.add_argument('--imb-rate',type=float, default=0.05)
 # parser.add_argument('--min-class', type=str, default='456')
 # parser.add_argument('--maj-class', type=str, default='789')
-parser.add_argument('--training-steps', type=int, default=200000)
+parser.add_argument('--training-steps', type=int, default=1465359)
 args = parser.parse_args()
 
 
 
 # TODO(zenglinfan) load dataset
-x_train = np.load(r'D://ids2018//ndarray//train//data.npy')
-y_train = np.load(r'D://ids2018//ndarray//train//lables.npy')
-x_test = np.load(r'D://ids2018//ndarray//test//data.npy')
-y_test = np.load(r'D://ids2018//ndarray//test//lables.npy')
+train_path='D:\\ids2018\\tfrecord\\train'
+test_path='D:\\ids2018\\tfrecord\\test'
+valid_path='D:\\ids2018\\tfrecord\\valid'
 
-
-print(f"x_train shape: {x_train.shape}")
-print(f"y_train.shape: {y_train.shape}")
-
-in_shape = x_train.shape[1:]
-num_classes = 15
 mode = 'train'
-env = ClassifyEnv(mode, x_train, y_train)
+env = ClassifyEnv(mode, data_path=train_path)
+
+in_shape = env.observation_space.shape
+print(f"inshape: {in_shape}")
+num_classes = _num_class
 nb_actions = num_classes
 training_steps = args.training_steps
 model = get_pbcnn_model()
@@ -80,9 +80,6 @@ dqn.compile(Adam(learning_rate=.00025), metrics=['mae'])
 dqn.fit(env, nb_steps=training_steps, log_interval=60000)
 
 
-env.mode = 'test'
-dqn.test(env, nb_episodes=1, visualize=False)
-env = ClassifyEnv(mode, x_test, y_test)
-env.mode = 'test'
+env = ClassifyEnv('test', data_path=test_path)
 dqn.test(env, nb_episodes=1, visualize=False)
 
