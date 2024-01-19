@@ -21,16 +21,24 @@ parser = argparse.ArgumentParser()
 # parser.add_argument('--imb-rate',type=float, default=0.05)
 # parser.add_argument('--min-class', type=str, default='456')
 # parser.add_argument('--maj-class', type=str, default='789')
-parser.add_argument('--training-steps', type=int, default=200000)
+parser.add_argument('--training-steps', type=int, default=983431)
 args = parser.parse_args()
+
+# train_path count: 1465359
+# test_path count: 732689
+# valid_path count: 244225
+# train_us_os count: 983431
 
 
 
 # TODO(zenglinfan) load dataset
-x_train = np.load(r'D://ids2018//ndarray//train//data.npy')
-y_train = np.load(r'D://ids2018//ndarray//train//lables.npy')
-x_test = np.load(r'D://ids2018//ndarray//test//data.npy')
-y_test = np.load(r'D://ids2018//ndarray//test//lables.npy')
+x_train_path = 'D:\\ids2018\\tfrecord\\train_us_os\\features.npy'
+y_train_path = 'D:\\ids2018\\tfrecord\\train_us_os\\labels.npy'
+x_test_path = 'D:\\ids2018\\tfrecord\\test\\features.npy'
+y_test_path = 'D:\\ids2018\\tfrecord\\test\\labels.npy'
+
+x_train = np.memmap(x_train_path, dtype='float32', mode='r', shape=(983431, 20, 256, 1))
+y_train = np.memmap(y_train_path, dtype='int64', mode='r', shape=(983431,))
 
 
 print(f"x_train shape: {x_train.shape}")
@@ -74,14 +82,16 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
                               nb_steps=100000)
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, enable_double_dqn = True, memory=memory,
                processor=processor, nb_steps_warmup=50000, gamma=0.5, target_model_update=10000,
-               train_interval=4, delta_clip=1.)
+               train_interval=4)
 dqn.compile(Adam(learning_rate=.00025), metrics=['mae'])
 
 dqn.fit(env, nb_steps=training_steps, log_interval=60000)
 
 
-env.mode = 'test'
-dqn.test(env, nb_episodes=1, visualize=False)
+# env.mode = 'test'
+# dqn.test(env, nb_episodes=1, visualize=False)
+x_test = np.memmap(x_test_path, dtype='float32', mode='r', shape=(732689, 20, 256, 1))
+y_test = np.memmap(y_test_path, dtype='int64', mode='r', shape=(732689,))
 env = ClassifyEnv(mode, x_test, y_test)
 env.mode = 'test'
 dqn.test(env, nb_episodes=1, visualize=False)
